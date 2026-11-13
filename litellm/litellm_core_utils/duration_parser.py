@@ -176,6 +176,30 @@ def get_annual_budget_window_start(reset_at: datetime, timezone_str: str) -> dat
     return _shift_months(boundary, -12).astimezone(timezone.utc)
 
 
+def budget_duration_in_months(duration: str) -> int | None:
+    """Calendar months `duration` spans when it is a `Nmo` interval, else None."""
+    value, unit = _parse_duration(normalize_duration(duration))
+    if unit != "mo" or not value:
+        return None
+    return value
+
+
+def get_budget_window_start_from_reset(reset_at: datetime, duration: str, timezone_str: str = "UTC") -> datetime:
+    """Start of the `duration` window that ends at `reset_at`.
+
+    `Nmo` intervals are counted on the calendar in `timezone_str` from the stored boundary,
+    the same rule `get_next_standardized_reset_time` used to pick it, so a `2mo` window
+    ending 1 September opens on 1 July no matter when it is read. Measuring months with
+    `duration_in_seconds` counts them from *now*, which puts that start on 2 July and leaves
+    1 July's spend outside the window it belongs to. Fixed-length units are subtracted as
+    seconds either way."""
+    months: Final = budget_duration_in_months(duration)
+    if months is None:
+        return reset_at - timedelta(seconds=duration_in_seconds(duration))
+    boundary: Final = _setup_timezone(reset_at, timezone_str)[0]
+    return _shift_months(boundary, -months).astimezone(timezone.utc)
+
+
 def get_budget_window_start(duration: str, reset_at: datetime) -> datetime:
     """Start of the budget period that ends at `reset_at`, under the same rules
     `get_next_standardized_reset_time` used to pick it: `30d` and `Nmo` span calendar

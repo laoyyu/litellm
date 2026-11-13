@@ -332,6 +332,36 @@ class TestResetTimeOfDay(unittest.TestCase):
         result = get_next_standardized_reset_time("1mo", now, "UTC", reset_time_of_day=time(12, 0))
         self.assertEqual(result, datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc))
 
+    def test_multi_month_reset_rolls_the_requested_number_of_months(self):
+        # `Nmo` is calendar-aware everywhere else in this module (duration_in_seconds,
+        # duration_in_seconds_from, get_budget_window_start), so the reset time has to
+        # roll N months too instead of rejecting anything but 1mo.
+        now = datetime(2023, 5, 15, 10, 30, 0, tzinfo=timezone.utc)
+        self.assertEqual(
+            get_next_standardized_reset_time("2mo", now, "UTC"),
+            datetime(2023, 7, 1, 0, 0, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            get_next_standardized_reset_time(
+                "3mo", datetime(2023, 5, 15, 15, 0, 0, tzinfo=timezone.utc), "UTC", reset_time_of_day=time(12, 0)
+            ),
+            datetime(2023, 8, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+
+    def test_multi_month_reset_crosses_the_year_boundary(self):
+        now = datetime(2023, 12, 15, 9, 0, 0, tzinfo=timezone.utc)
+        self.assertEqual(
+            get_next_standardized_reset_time("2mo", now, "UTC"),
+            datetime(2024, 2, 1, 0, 0, 0, tzinfo=timezone.utc),
+        )
+
+    def test_multi_month_reset_before_this_months_offset_stays_this_month(self):
+        now = datetime(2023, 6, 1, 9, 0, 0, tzinfo=timezone.utc)
+        self.assertEqual(
+            get_next_standardized_reset_time("2mo", now, "UTC", reset_time_of_day=time(12, 0)),
+            datetime(2023, 6, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+
     def test_custom_day_reset_applies_offset(self):
         now = datetime(2023, 5, 15, 10, 30, 0, tzinfo=timezone.utc)
         result = get_next_standardized_reset_time("3d", now, "UTC", reset_time_of_day=time(12, 0))

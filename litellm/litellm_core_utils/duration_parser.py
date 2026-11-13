@@ -257,13 +257,6 @@ def _next_occurrence(
     return candidate
 
 
-def _first_of_next_month(first_of_month: datetime) -> datetime:
-    """Given the 1st of some month, return the 1st of the following month."""
-    if first_of_month.month == 12:
-        return first_of_month.replace(year=first_of_month.year + 1, month=1)
-    return first_of_month.replace(month=first_of_month.month + 1)
-
-
 def _handle_day_reset(
     current_time: datetime,
     base_midnight: datetime,
@@ -394,7 +387,9 @@ def _handle_month_reset(
 ) -> datetime:
     """
     Handle monthly reset times. Resets land on the 1st at `reset_time_of_day`; if the
-    1st of the current month at that time has already passed, roll to the 1st of next month.
+    1st of the current month at that time has already passed, roll `value` months ahead
+    so `Nmo` windows stay aligned with the calendar the way `_shift_months` and
+    `get_budget_window_start` already treat them.
 
     Args:
         current_time: Current datetime
@@ -413,11 +408,11 @@ def _handle_month_reset(
             if annual_candidate <= current_time
             else annual_candidate
         )
-    if value != 1:
-        raise ValueError("Calendar resets support 1 month or 12 month intervals")
+    if value < 1:
+        raise ValueError("Calendar resets require a positive number of months")
 
     first_of_this_month: Final = base_midnight.replace(day=1)
     candidate: Final = _apply_time_of_day(first_of_this_month, reset_time_of_day)
     if candidate <= current_time:
-        return _apply_time_of_day(_first_of_next_month(first_of_this_month), reset_time_of_day)
+        return _apply_time_of_day(_shift_months(first_of_this_month, value), reset_time_of_day)
     return candidate

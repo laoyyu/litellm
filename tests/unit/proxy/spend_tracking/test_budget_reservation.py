@@ -490,6 +490,8 @@ def test_annual_window_keeps_all_spend_from_its_reset_boundary(
         ("1mo", "2028-09-01T00:00:00Z", datetime(2028, 8, 1, tzinfo=timezone.utc)),
         ("2mo", "2028-09-01T00:00:00Z", datetime(2028, 7, 1, tzinfo=timezone.utc)),
         ("3mo", "2028-09-01T00:00:00Z", datetime(2028, 6, 1, tzinfo=timezone.utc)),
+        ("30d", "2028-09-01T00:00:00Z", datetime(2028, 8, 1, tzinfo=timezone.utc)),
+        ("monthly", "2028-09-01T00:00:00Z", datetime(2028, 8, 1, tzinfo=timezone.utc)),
     ],
 )
 def test_month_window_start_is_the_same_boundary_whatever_day_it_is_read(
@@ -500,6 +502,21 @@ def test_month_window_start_is_the_same_boundary_whatever_day_it_is_read(
     1 September on 2 July whenever it was read on 1 August."""
     with patch("time.time", return_value=datetime.fromisoformat(today).replace(tzinfo=timezone.utc).timestamp()):
         assert get_budget_window_start({"budget_duration": duration, "reset_at": reset_at}) == expected
+
+
+@pytest.mark.parametrize(
+    ("reset_at", "expected"),
+    [
+        ("2028-03-01T00:00:00Z", datetime(2028, 2, 1, tzinfo=timezone.utc)),
+        ("2028-11-01T00:00:00Z", datetime(2028, 10, 1, tzinfo=timezone.utc)),
+    ],
+)
+def test_thirty_days_opens_on_the_month_it_resets_on(reset_at: str, expected: datetime) -> None:
+    """`30d` resets on the 1st, so subtracting a fixed 30 days opened a window ending
+    1 March on 31 January: the 31st was counted by the window it had just left, and a
+    window ending 1 November opened on 2 October with the 1st left out."""
+    with patch("time.time", return_value=datetime(2028, 2, 15, tzinfo=timezone.utc).timestamp()):
+        assert get_budget_window_start({"budget_duration": "30d", "reset_at": reset_at}) == expected
 
 
 class _AnnualWindowDatabase:

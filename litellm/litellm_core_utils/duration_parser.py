@@ -177,22 +177,29 @@ def get_annual_budget_window_start(reset_at: datetime, timezone_str: str) -> dat
 
 
 def budget_duration_in_months(duration: str) -> int | None:
-    """Calendar months `duration` spans when it is a `Nmo` interval, else None."""
+    """Calendar months `duration` spans: `Nmo`, plus `30d`, which `_handle_day_reset`
+    resets on the 1st and `get_budget_window_start` already counts as one month."""
     value, unit = _parse_duration(normalize_duration(duration))
-    if unit != "mo" or not value:
+    if not value:
         return None
-    return value
+    if unit == "mo":
+        return value
+    if unit == "d" and value == 30:
+        return 1
+    return None
 
 
 def get_budget_window_start_from_reset(reset_at: datetime, duration: str, timezone_str: str = "UTC") -> datetime:
     """Start of the `duration` window that ends at `reset_at`.
 
-    `Nmo` intervals are counted on the calendar in `timezone_str` from the stored boundary,
-    the same rule `get_next_standardized_reset_time` used to pick it, so a `2mo` window
-    ending 1 September opens on 1 July no matter when it is read. Measuring months with
-    `duration_in_seconds` counts them from *now*, which puts that start on 2 July and leaves
-    1 July's spend outside the window it belongs to. Fixed-length units are subtracted as
-    seconds either way."""
+    `Nmo` intervals — and `30d`, which the scheduler resets on the 1st — are counted on
+    the calendar in `timezone_str` from the stored boundary, the same rule
+    `get_next_standardized_reset_time` used to pick it, so a `2mo` window ending
+    1 September opens on 1 July no matter when it is read. Measuring months with
+    `duration_in_seconds` counts them from *now*, which puts that start on 2 July and
+    leaves 1 July's spend outside the window it belongs to; for `30d` it lands on
+    whatever day the closed month's length leaves, opening a window ending 1 March on
+    31 January. Fixed-length units are subtracted as seconds either way."""
     months: Final = budget_duration_in_months(duration)
     if months is None:
         return reset_at - timedelta(seconds=duration_in_seconds(duration))
